@@ -173,7 +173,8 @@ function sleep(time) {
     const modelURL = await GM_getResourceURL('ONNX_MODEL');
 
     // ['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm']
-    // 加载这两个文件比较慢，又不知道为啥不能缓存，常识过 @resource 直接无法加载
+    // 加载这两个文件比较慢，又不知道为啥不能缓存
+    // 尝试过 @resource 直接无法加载 onnx
     const wasmBaseURL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
     ort.env.wasm.wasmPaths = wasmBaseURL;
 
