@@ -4,7 +4,7 @@
 
 ## 数据集下载
 
-链接： [https://pan.do1e.cn/%E5%8D%97%E4%BA%AC%E5%A4%A7%E5%AD%A6/NJU-captcha-dataset.7z](https://pan.do1e.cn/%E5%8D%97%E4%BA%AC%E5%A4%A7%E5%AD%A6/NJU-captcha-dataset.7z)，解压密码：`@Do1e`
+链接： [https://pan.do1e.cn/南京大学/NJU-captcha-dataset.7z](https://pan.do1e.cn/%E5%8D%97%E4%BA%AC%E5%A4%A7%E5%AD%A6/NJU-captcha-dataset.7z)，解压密码：`@Do1e`
 
 包含了 100,000 张验证码图片，文件名称为`{验证码文本}_{图片md5}.jpg`。验证码文本标注为全小写。
 
