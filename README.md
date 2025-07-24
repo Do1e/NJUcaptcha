@@ -1,78 +1,68 @@
-# 南大统一身份认证自动填充验证码
+# 南大统一身份认证验证码（数据集、识别模型、识别服务）
 
 ![效果](img/效果.gif)
 
-识别服务器代码 [server.py](server.py) [@Do1e](https://github.com/Do1e)
+## 数据集下载
 
-Tampermonkey脚本 [send_captcha.js](send_captcha.js) [@Bubbleioa](https://github.com/Bubbleioa)
+链接： [https://pan.do1e.cn/%E5%8D%97%E4%BA%AC%E5%A4%A7%E5%AD%A6/NJU-captcha-dataset.7z](https://pan.do1e.cn/%E5%8D%97%E4%BA%AC%E5%A4%A7%E5%AD%A6/NJU-captcha-dataset.7z)，解压密码：`@Do1e`
 
-## 无域名和SSL证书使用（不建议）
+包含了 100,000 张验证码图片，文件名称为`{验证码文本}_{图片md5}.jpg`。验证码文本标注为全小写。
 
-注：如果你的服务器已经安装了证书，可在 [server.py L25](server.py#L25) 中修改`certfile`和`keyfile`的值为你的证书路径，或者删除这两个参数使用nginx等反向代理，即可不用配置证书。
+基于 [ddddocr](https://github.com/sml2h3/ddddocr) 和 [NJUlogin](https://github.com/Do1e/NJUlogin) 进行识别与正确性验证，识别错误的为手动标注。
 
-### 服务器
+## 数据集构建
 
-1. 下载 [mkcert](https://github.com/FiloSottile/mkcert/releases)
-2. 打开终端运行 `./mkcert -install`，安装根证书
-3. 运行 `./mkcert xxx.xxx.xxx.xxx`，生成SSL证书，其中`xxx.xxx.xxx.xxx`为你的服务器IP地址。此时得到`xxx.xxx.xxx.xxx.pem`和`xxx.xxx.xxx.xxx-key.pem`两个文件，填入 [server.py L25](server.py#L25) 中的`certfile`和`keyfile`参数。
-4. 运行 `./mkcert -CAROOT` 查看根证书路径，找到该路径下的`rootCA.pem`文件，后缀改为`.crt`。
-5. 运行[server.py](server.py)，Windows下 `pythonw server.py`，Linux下 `nohup python server.py &`，即可实现后台运行。
+[build_dataset](build_dataset) 目录下包含了南大统一身份认证验证码的数据集构建代码。
 
-Linux下也可使用`systemd`实现开机自启动，创建`/etc/systemd/system/read_captcha.service`文件，内容如下：
+需要先配置下述环境变量：  
+1. `NJU_USERNAME`：南大统一身份认证用户名
+2. `NJU_PASSWORD`：南大统一身份认证密码
+3. `DOWNLOAD_DIR`：验证码图片下载目录
+4. `NUM_REQUIRE`：需要下载的验证码图片数量，默认为 100,000
 
-```ini
-[Unit]
-Description=readcaptcha
-After=network.target
+之后运行脚本 [build_dataset/download.py](build_dataset/download.py)，会将验证码图片下载到指定目录，其中正确的验证码放在 `right` 文件夹中，错误的验证码放在 `wrong` 文件夹中，需要手动重命名并移动到 `right` 文件夹中。
 
-[Service]
-Type=idle
-User=root
-Restart=on-failure
-RestartSec=60s
-WorkingDirectory=/path/to/read_captcha
-ExecStart=python sever.py
+完成后还需运行脚本 [build_dataset/post_processing.py](build_dataset/post_processing.py)，分配训练、验证和测试集并生成数据集信息，需要指定环境变量 `DOWNLOAD_DIR` 和 `TRAIN_RATIO`（训练集比例，默认为 0.8）。
 
-[Install]
-WantedBy=multi-user.target
-```
+## 识别模型
 
-运行`systemctl enable read_captcha`即可实现开机自启动，`systemctl start read_captcha`启动服务。
+[model](model) 目录下包含了南大统一身份认证验证码的识别模型及其训练代码。
 
-### 客户端
+设计了一个 [轻量化的CNN模型](model/model.py)  
+参数量 588,424  
+模型尺寸 2.24MiB
 
-1. 双击安装之前保存的根证书 `rootCA.crt` 至可信任根证书颁发机构。
-2. 在浏览器中访问 `https://xxx.xxx.xxx.xxx`，若提示不安全，说明证书配置失败；
-   ![证书配置失败](img/证书配置失败.png)
-3. 若正确提示 `Welcome to the Captcha Server! Post your captcha to /api`，说明证书配置成功。
-   ![证书配置成功](img/证书配置成功.png)
-4. 修改 [send_captcha.js L20](send_captcha.js#L20) 中的 `url` 变量为你的服务器地址，并在 Tampermonkey 中安装。
-5. 此时访问 [统一身份认证](https://authserver.nju.edu.cn/authserver/login) ，即可自动填充验证码。
+训练脚本： [model/train.py](model/train.py)  
+或者直接使用导出的 [onnx](model/checkpoints/nju_captcha.onnx)。
 
-## 有域名和SSL证书使用
+查看模型架构可以使用 [netron](https://netron.app/) 打开 [onnx](model/checkpoints/nju_captcha.onnx)。
 
-### 服务器
+## 识别服务
+[service](service) 目录下包含了南大统一身份认证验证码的识别服务代码。
 
-1. 在服务器上安装nginx，配置SSL证书。
-2. 使用docker运行，可自定义端口：
+也可以使用我在 [vercel](https://njucaptcha.vercel.app) 上部署的服务。
+
+#### docker
 
 ```bash
-docker run -d --restart=always --name readcaptcha \
-    -e PORT=12345 \
-    -p 127.0.0.1:12345:12345 \
-    do1e/readcaptcha:latest
+docker build -t nju-captcha-service .
+docker run -d --name nju-captcha-service -p 8000:8000 nju-captcha-service
 ```
-3. nginx配置示例：
+
+nginx 配置示例：
 
 ```nginx
 server {
+    listen 80;
+    listen [::]:80;
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name example.com;
-    access_log /var/log/nginx/readcaptcha.access.log;
-    error_log /var/log/nginx/readcaptcha.error.log;
+    if ($scheme = http) {
+        return 301 https://$host$request_uri;
+    }
     location / {
-        proxy_pass http://127.0.0.1:12345;
+        proxy_pass http://127.0.0.1:8000$request_uri;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -84,7 +74,75 @@ server {
 }
 ```
 
-### 客户端
+#### vercel
 
-1. 修改 [send_captcha.js L20](send_captcha.js#L20) 中的 `url` 变量为你的服务器地址，并在 Tampermonkey 中安装。
-2. 此时访问 [统一身份认证](https://authserver.nju.edu.cn/authserver/login) ，即可自动填充验证码。
+```bash
+npm install -g vercel
+vercel login
+vercel --prod
+```
+
+#### 测试
+
+```bash
+captcha_b64=$(base64 -i captcha.jpg | tr -d '\n')
+curl -X POST 'https://njucaptcha.vercel.app' \
+     -H 'Content-Type: application/x-www-form-urlencoded' \
+     -d "captcha=$(echo "$captcha_b64" | jq -s -R -r @uri)"
+```
+
+#### 油猴脚本自动填充
+
+```javascript
+// ==UserScript==
+// @name         南大统一身份认证自动填充验证码
+// @namespace    https://bubbleioa.top/
+// @version      1.0
+// @description  南大统一身份认证自动填充验证码
+// @author       Bubbleioa, Do1e
+// @license      GPL-3.0
+// @match        https://authserver.nju.edu.cn/authserver/login*
+// @icon         https://www.do1e.cn/favicon.ico
+// @grant        none
+// @run-at       document-body
+// ==/UserScript==
+
+function sleep(time) {
+    return new Promise((resolve) => setTimeout(resolve, time));
+}
+
+
+(function () {
+    'use strict';
+    const serverUrl = 'https://njucaptcha.vercel.app'; // 替换为你的验证码识别服务地址
+    // 等待图片加载完成
+    sleep(500).then(() => {
+        // 获取验证码 base64 编码
+        var canvas = document.createElement('canvas');
+        var context = canvas.getContext('2d');
+        var inputField = document.getElementById('captchaResponse');
+        var img = document.getElementById('captchaImg');
+        canvas.height = img.naturalHeight;
+        canvas.width = img.naturalWidth;
+        context.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+        var base64String = canvas.toDataURL();
+        // 发送到验证码识别服务器 修改输入框
+        fetch(serverUrl, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            redirect: 'follow',
+            referrerPolicy: 'no-referrer',
+            body: new URLSearchParams({
+                'captcha': base64String.split(',')[1]
+            })
+        }).then((resp) => resp.text()).then(text => {
+            inputField.value = text;
+        });
+    });
+})();
+```

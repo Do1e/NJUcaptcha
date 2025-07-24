@@ -1,4 +1,23 @@
-*.pem
-*.crt
-mkcert*
-*.pyc
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Dataset
+pic/*
+
+# checkpoint
+*.pth
+
+# vercel
+.vercel
+
+# captcha images
+*.jpg
+!captcha.jpg

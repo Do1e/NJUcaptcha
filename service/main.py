@@ -1,5 +1,6 @@
 import base64
 import os
+import traceback
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -19,20 +20,21 @@ app.add_middleware(
 
 
 @app.post("/")
-async def readcaptcha(request: Request) -> Response:
+async def identify_captcha(request: Request) -> Response:
     try:
-        image = dict(await request.form())["captcha"]
+        image = dict(await request.form())["captcha"].replace(" ", "+")
         image = base64.b64decode(image)
         return PlainTextResponse(ocr.get_text(image))
     except KeyError as e:
-        return Response(status_code=400, content=str(e))
+        return Response(status_code=400, content="Missing 'captcha' field in the request body.")
     except Exception as e:
-        return Response(status_code=500, content=str(e))
+        print(traceback.format_exc() + str(image))
+        return Response(status_code=500, content="Internal Server Error")
 
 
 @app.get("/")
 async def index() -> Response:
-    return PlainTextResponse("Post your captcha image to this url.")
+    return PlainTextResponse("Post your captcha image to this url.\nExample:\n{\n    \"captcha\": \"/9j/4AAQSkZJRgABAgAAAQABAAD/2wBDAA...\"\n}")
 
 
 if __name__ == "__main__":
