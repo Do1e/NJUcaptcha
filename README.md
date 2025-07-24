@@ -146,3 +146,125 @@ function sleep(time) {
     });
 })();
 ```
+
+#### 无服务端油猴脚本自动填充
+
+```javascript
+// ==UserScript==
+// @name         南大统一身份认证自动填充验证码 (ONNX Runtime Web)
+// @namespace    https://bubbleioa.top/
+// @version      2.0
+// @description  使用ONNX Runtime Web在客户端自动识别南大统一身份认证验证码
+// @author       Bubbleioa, Do1e
+// @license      GPL-3.0
+// @match        https://authserver.nju.edu.cn/authserver/login*
+// @icon         https://www.do1e.cn/favicon.ico
+// @grant        GM_xmlhttpRequest
+// @connect      *
+// @require      https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js
+// @resource     ONNX_MODEL https://www.do1e.cn/api/v2/objects/file/nju_captcha.onnx
+// @grant        GM_getResourceURL
+// @run-at       document-body
+// ==/UserScript==
+
+(async function () {
+    'use strict';
+
+    const modelURL = await GM_getResourceURL('ONNX_MODEL');
+
+    // ['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm']
+    // 加载这两个文件比较慢，又不知道为啥不能缓存，常识过 @resource 直接无法加载
+    const wasmBaseURL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+    ort.env.wasm.wasmPaths = wasmBaseURL;
+
+    const charset = ['1', '2', '3', '4', '5', '6', '7', '8', 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'k', 'n', 'p', 'q', 'x', 'y', 'z'];
+    const resizeWidth = 176;
+    const resizeHeight = 64;
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const img = document.getElementById('captchaImg');
+    if (!img) {
+        console.error('未找到验证码图片元素');
+        return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = resizeWidth;
+    canvas.height = resizeHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, resizeWidth, resizeHeight);
+    const imageData = ctx.getImageData(0, 0, resizeWidth, resizeHeight);
+    const { data } = imageData;
+
+    const mean = [0.743, 0.7432, 0.7431];
+    const std = [0.1917, 0.1918, 0.1917];
+
+    const float32Data = new Float32Array(3 * resizeHeight * resizeWidth);
+    for (let i = 0; i < resizeHeight * resizeWidth; i++) {
+        const r = data[i * 4] / 255.0;
+        const g = data[i * 4 + 1] / 255.0;
+        const b = data[i * 4 + 2] / 255.0;
+
+        float32Data[i] = (r - mean[0]) / std[0];
+        float32Data[i + resizeHeight * resizeWidth] = (g - mean[1]) / std[1];
+        float32Data[i + 2 * resizeHeight * resizeWidth] = (b - mean[2]) / std[2];
+    }
+
+    try {
+        GM_xmlhttpRequest({
+            method: "GET",
+            url: modelURL,
+            responseType: "arraybuffer",
+            onload: async function(response) {
+                if (response.status !== 200) {
+                    console.error(`下载ONNX模型失败，状态码: ${response.status}`);
+                    return;
+                }
+                const modelData = response.response;
+                const session = await ort.InferenceSession.create(modelData, {
+                    executionProviders: ['wasm']
+                });
+
+                const inputTensor = new ort.Tensor('float32', float32Data, [1, 3, resizeHeight, resizeWidth]);
+                const feeds = { 'input': inputTensor };
+
+                const results = await session.run(feeds);
+                const outputTensor = results.output;
+
+                const outputData = outputTensor.data;
+                let text = '';
+                const charCount = 4;
+                const numClasses = 22;
+
+                for (let i = 0; i < charCount; i++) {
+                    const startIndex = i * numClasses;
+                    const endIndex = startIndex + numClasses;
+                    const classScores = Array.from(outputData.slice(startIndex, endIndex));
+                    
+                    let maxScore = -Infinity;
+                    let maxIndex = -1;
+                    for(let j = 0; j < classScores.length; j++) {
+                        if (classScores[j] > maxScore) {
+                            maxScore = classScores[j];
+                            maxIndex = j;
+                        }
+                    }
+                    text += charset[maxIndex];
+                }
+
+                const inputField = document.getElementById('captchaResponse');
+                if (inputField) {
+                    inputField.value = text;
+                } else {
+                    console.error('未找到验证码输入框');
+                }
+            },
+            onerror: function(error) {
+                console.error('下载ONNX模型失败:', error);
+            }
+        });
+    } catch (error) {
+        console.error('ONNX Runtime Web 执行出错:', error);
+    }
+})();
+```
