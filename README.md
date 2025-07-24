@@ -162,7 +162,7 @@ function sleep(time) {
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @require      https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js
-// @resource     ONNX_MODEL https://www.do1e.cn/api/v2/objects/file/nju_captcha.onnx
+// @resource     ONNX_MODEL https://cdn.jsdelivr.net/gh/Do1e/NJUcaptcha@main/model/checkpoints/nju_captcha.onnx
 // @grant        GM_getResourceURL
 // @run-at       document-body
 // ==/UserScript==
