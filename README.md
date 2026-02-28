@@ -1,5 +1,8 @@
 # 南大统一身份认证验证码（数据集、识别模型、识别服务）
 
+> [!CAUTION]
+> 由于2026年2月7日统一身份认证的更新，当前分支已失效。
+
 ![效果](assets/效果.gif)
 
 ## 数据集下载
@@ -105,3 +108,4 @@ const serverUrl = currentUrl.includes('//p.nju.edu.cn') ? url_nju : url_pub;
 [**NJU server api 版本**](https://raw.githubusercontent.com/Do1e/NJUcaptcha/refs/heads/main/njucaptcha_nju.user.js)：上述介绍的最佳实践，我毕业后将无法使用。
 
 [**本地 onnx 推理版本**](https://raw.githubusercontent.com/Do1e/NJUcaptcha/refs/heads/main/njucaptcha_onnx.user.js)：第一次需要科学上网缓存 wasm 相关文件，后续就不用了，也比较快（能在页面加载完成瞬间填充上验证码）。
+
